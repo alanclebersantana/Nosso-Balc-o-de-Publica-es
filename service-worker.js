@@ -2,13 +2,14 @@
    Service Worker — cache do "app shell" para uso offline e instalação
    ========================================================================== */
 
-const VERSAO_CACHE = "publicacoes-v1";
+const VERSAO_CACHE = "publicacoes-v4";
 
 const ARQUIVOS_ESSENCIAIS = [
   "./",
   "./index.html",
   "./manifest.json",
   "./css/style.css",
+  "./js/temas.js",
   "./js/data.js",
   "./js/sync.js",
   "./js/export.js",

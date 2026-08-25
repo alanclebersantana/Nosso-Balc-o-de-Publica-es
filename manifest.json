@@ -1,13 +1,13 @@
 {
-  "name": "Publicações — Controle de Movimento",
-  "short_name": "Publicações",
+  "name": "Nosso Balcão Publicações",
+  "short_name": "Nosso Balcão",
   "description": "Controle de movimento mensal de publicações (S-28-T) com cálculo automático de estoque, entrada e saída, sincronizado entre dispositivos.",
   "start_url": "./index.html",
   "scope": "./",
   "display": "standalone",
   "orientation": "portrait-primary",
-  "background_color": "#0d3450",
-  "theme_color": "#12405f",
+  "background_color": "#f1f1ef",
+  "theme_color": "#8a3e13",
   "lang": "pt-BR",
   "dir": "ltr",
   "icons": [

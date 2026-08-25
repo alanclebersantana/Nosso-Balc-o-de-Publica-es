@@ -153,15 +153,38 @@ function idItem(sigla) {
   return "item_" + sigla.replace(/[^a-zA-Z0-9_.-]/g, "_");
 }
 
-// Lista "achatada" de todos os itens, com id e categoria embutidos
-function listaAchatada() {
+// Catálogo completo = catálogo padrão do S-28-T + publicações personalizadas
+// que a congregação tiver adicionado, já agrupadas dentro da categoria certa.
+// `itensPersonalizados` é um array de { id, titulo, sigla, codigo, categoria, kit }.
+function catalogoCompleto(itensPersonalizados) {
+  const personalizados = Array.isArray(itensPersonalizados) ? itensPersonalizados : [];
+  return CATALOGO.map((cat) => ({
+    categoria: cat.categoria,
+    icone: cat.icone,
+    itens: [
+      ...cat.itens,
+      ...personalizados
+        .filter((p) => p.categoria === cat.categoria)
+        .map((p) => ({ ...p, personalizado: true })),
+    ],
+  }));
+}
+
+// Lista "achatada" de todos os itens, com id e categoria embutidos.
+// Passe a lista de personalizados para incluí-los também.
+function listaAchatada(itensPersonalizados) {
   const lista = [];
-  CATALOGO.forEach((cat) => {
+  catalogoCompleto(itensPersonalizados).forEach((cat) => {
     cat.itens.forEach((it) => {
-      lista.push({ ...it, id: idItem(it.sigla), categoria: cat.categoria });
+      const id = it.personalizado ? it.id : idItem(it.sigla);
+      lista.push({ ...it, id, categoria: cat.categoria });
     });
   });
   return lista;
+}
+
+function novoIdPersonalizado() {
+  return "custom_" + Date.now().toString(36) + "_" + Math.random().toString(36).slice(2, 8);
 }
 
 /* --------------------------------------------------------------------------
@@ -204,5 +227,5 @@ const Calc = {
 };
 
 if (typeof module !== "undefined") {
-  module.exports = { CATALOGO, CICLOS, idItem, listaAchatada, Calc };
+  module.exports = { CATALOGO, CICLOS, idItem, listaAchatada, catalogoCompleto, novoIdPersonalizado, Calc };
 }

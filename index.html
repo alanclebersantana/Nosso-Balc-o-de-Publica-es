@@ -3,14 +3,14 @@
 <head>
 <meta charset="UTF-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
-<title>Publicações — Controle de Movimento</title>
+<title>Nosso Balcão Publicações</title>
 <meta name="description" content="Controle de movimento mensal de publicações (S-28-T) com cálculo automático de estoque, entrada e saída." />
 
-<meta name="theme-color" content="#12405f" />
+<meta name="theme-color" content="#9c5320" id="meta-theme-color" />
 <meta name="mobile-web-app-capable" content="yes" />
 <meta name="apple-mobile-web-app-capable" content="yes" />
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
-<meta name="apple-mobile-web-app-title" content="Publicações" />
+<meta name="apple-mobile-web-app-title" content="Nosso Balcão" />
 
 <link rel="manifest" href="manifest.json" />
 <link rel="icon" href="icons/favicon-32.png" sizes="32x32" />
@@ -28,7 +28,7 @@
   <div class="cartao-setup">
     <div class="logo-setup">
       <img src="icons/icon-96.png" alt="" width="56" height="56" />
-      <h1>Publicações</h1>
+      <h1>Nosso Balcão Publicações</h1>
     </div>
     <p class="subtitulo">Controle de movimento mensal de publicações, com base no formulário S-28-T.</p>
 
@@ -67,10 +67,11 @@
   <header class="topo">
     <div class="topo-linha">
       <div class="marca">
-        <img src="icons/icon-96.png" alt="" width="30" height="30" />
+        <img src="icons/icon-96.png" alt="" width="34" height="34" />
         <div class="marca-texto">
-          <strong>Publicações</strong>
-          <span id="nome-congregacao">—</span>
+          <span class="marca-eyebrow">Nosso Balcão</span>
+          <span class="marca-nome">Publicações</span>
+          <span class="marca-sub" id="nome-congregacao">—</span>
         </div>
       </div>
 
@@ -81,6 +82,15 @@
         </button>
         <button id="status-sync" class="chip chip-status" title="Estado da sincronização">
           <span class="ponto"></span><span id="status-texto">conectando…</span>
+        </button>
+        <button id="btn-tema" class="botao-icone" title="Alternar modo escuro" aria-pressed="false">
+          <svg id="icone-tema-lua" viewBox="0 0 24 24" width="19" height="19" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M21 12.79A9 9 0 1111.21 3 7 7 0 0021 12.79z"/>
+          </svg>
+          <svg id="icone-tema-sol" viewBox="0 0 24 24" width="19" height="19" hidden fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round">
+            <circle cx="12" cy="12" r="4.2" fill="currentColor" stroke="none"/>
+            <path d="M12 2.5v2.2M12 19.3v2.2M4.2 4.2l1.6 1.6M18.2 18.2l1.6 1.6M2.5 12h2.2M19.3 12h2.2M4.2 19.8l1.6-1.6M18.2 5.8l1.6-1.6"/>
+          </svg>
         </button>
         <button id="btn-config" class="botao-icone" title="Configurações">
           <svg viewBox="0 0 24 24" width="20" height="20"><path fill="currentColor" d="M19.4 13a7.5 7.5 0 000-2l2-1.6-2-3.4-2.4 1a7.6 7.6 0 00-1.7-1L15 3h-6l-.3 2.7a7.6 7.6 0 00-1.7 1l-2.4-1-2 3.4L4.6 11a7.5 7.5 0 000 2l-2 1.6 2 3.4 2.4-1a7.6 7.6 0 001.7 1L9 21h6l.3-2.7a7.6 7.6 0 001.7-1l2.4 1 2-3.4-2-1.6zM12 15.5A3.5 3.5 0 1112 8.5a3.5 3.5 0 010 7z"/></svg>
@@ -175,8 +185,151 @@
 
     <hr />
 
+    <p class="secao-titulo">Aparência</p>
+
+    <div class="campo">
+      <label>Cor do app</label>
+      <div id="grade-paletas" class="grade-paletas"></div>
+    </div>
+
+    <div class="campo linha-opcao">
+      <label for="chk-tema-escuro" style="margin:0;">Modo escuro</label>
+      <label class="interruptor">
+        <input type="checkbox" id="chk-tema-escuro" />
+        <span class="trilho"></span>
+      </label>
+    </div>
+
+    <div class="campo linha-opcao">
+      <label style="margin:0;">Tamanho da fonte</label>
+      <div class="seletor-escala">
+        <button type="button" id="escala-menos" aria-label="Diminuir fonte">A−</button>
+        <span id="rotulo-escala">100%</span>
+        <button type="button" id="escala-mais" aria-label="Aumentar fonte">A+</button>
+      </div>
+    </div>
+
+    <hr />
+
+    <p class="secao-titulo">Publicações</p>
+
+    <div class="campo">
+      <button id="cfg-abrir-importar" class="botao botao-secundario botao-bloco">Atualizar / importar lista de publicações</button>
+    </div>
+
+    <hr />
+
     <div class="campo">
       <button id="cfg-trocar" class="botao botao-secundario botao-bloco">Sair / trocar de congregação</button>
+    </div>
+  </div>
+</div>
+
+<!-- ============================================================ -->
+<!-- Modal de detalhe (cartões do resumo do mês)                   -->
+<!-- ============================================================ -->
+<div id="modal-detalhe" class="overlay" hidden>
+  <div class="cartao-modal">
+    <div class="cartao-modal-topo">
+      <h2 id="detalhe-titulo">Detalhes</h2>
+      <button id="fechar-detalhe" class="botao-icone" aria-label="Fechar">
+        <svg viewBox="0 0 24 24" width="20" height="20"><path fill="currentColor" d="M6.4 4.9L4.9 6.4 10.6 12l-5.7 5.6 1.5 1.5L12 13.4l5.6 5.7 1.5-1.5L13.4 12l5.7-5.6-1.5-1.5L12 10.6z"/></svg>
+      </button>
+    </div>
+    <p id="detalhe-intro" class="detalhe-intro"></p>
+    <div id="detalhe-lista" class="lista-detalhe"></div>
+  </div>
+</div>
+
+<!-- ============================================================ -->
+<!-- Modal de publicação personalizada (adicionar / editar)        -->
+<!-- ============================================================ -->
+<div id="modal-item" class="overlay" hidden>
+  <div class="cartao-modal">
+    <div class="cartao-modal-topo">
+      <h2>Adicionar publicação</h2>
+      <button id="fechar-item" class="botao-icone" aria-label="Fechar">
+        <svg viewBox="0 0 24 24" width="20" height="20"><path fill="currentColor" d="M6.4 4.9L4.9 6.4 10.6 12l-5.7 5.6 1.5 1.5L12 13.4l5.6 5.7 1.5-1.5L13.4 12l5.7-5.6-1.5-1.5L12 10.6z"/></svg>
+      </button>
+    </div>
+    <form id="form-item">
+      <div class="campo">
+        <label for="item-titulo">Nome da publicação</label>
+        <input id="item-titulo" type="text" required placeholder="ex.: Convite especial de outubro" />
+      </div>
+      <div class="campo">
+        <label for="item-categoria">Categoria</label>
+        <select id="item-categoria"></select>
+      </div>
+      <div class="campo">
+        <label for="item-sigla">Sigla ou código (opcional)</label>
+        <input id="item-sigla" type="text" placeholder="ex.: co-out" />
+      </div>
+      <p class="ajuda">Essa publicação passa a aparecer na categoria escolhida para todo mundo que usar este código de congregação, e também entra na exportação em PDF.</p>
+      <div class="linha-botoes">
+        <button type="submit" class="botao botao-primario">Adicionar</button>
+      </div>
+    </form>
+  </div>
+</div>
+
+<!-- ============================================================ -->
+<!-- Modal de importar / renovar lista de publicações               -->
+<!-- ============================================================ -->
+<div id="modal-importar" class="overlay" hidden>
+  <div class="cartao-modal largo">
+    <div class="cartao-modal-topo">
+      <h2>Atualizar lista de publicações</h2>
+      <button id="fechar-importar" class="botao-icone" aria-label="Fechar">
+        <svg viewBox="0 0 24 24" width="20" height="20"><path fill="currentColor" d="M6.4 4.9L4.9 6.4 10.6 12l-5.7 5.6 1.5 1.5L12 13.4l5.6 5.7 1.5-1.5L13.4 12l5.7-5.6-1.5-1.5L12 10.6z"/></svg>
+      </button>
+    </div>
+
+    <p class="ajuda">
+      O catálogo oficial do formulário S-28-T (Bíblias, livros, brochuras, folhetos, cartões e revistas) vem pronto no
+      app e não pode ser lido de um PDF automaticamente — a Sociedade não publica esse arquivo em um formato que dê para
+      importar direto. As opções abaixo controlam as <strong>publicações extras</strong> que vocês adicionarem (a lista
+      oficial continua sempre disponível, junto).
+    </p>
+
+    <p class="secao-titulo">1. Exportar as publicações extras atuais</p>
+    <div class="campo">
+      <button id="btn-exportar-csv" class="botao botao-secundario botao-bloco">Baixar em CSV</button>
+      <p class="ajuda">Abra o arquivo numa planilha, adicione/remova/edite linhas mantendo as colunas, e importe de volta abaixo.</p>
+    </div>
+
+    <hr />
+
+    <p class="secao-titulo">2. Importar publicações extras (CSV)</p>
+    <div class="campo">
+      <div class="zona-importar">
+        Escolha um arquivo .csv com as colunas <strong>categoria, titulo, sigla, codigo, kit</strong>
+        <br /><input type="file" id="input-importar-csv" accept=".csv,text/csv" />
+      </div>
+      <label style="margin-top:12px;">O que fazer com o que for importado?</label>
+      <select id="modo-importar">
+        <option value="somar">Somar às publicações extras já cadastradas</option>
+        <option value="substituir">Substituir todas as publicações extras cadastradas</option>
+      </select>
+      <div class="linha-botoes">
+        <button id="btn-importar-csv" class="botao botao-primario">Importar arquivo</button>
+      </div>
+    </div>
+
+    <hr />
+
+    <p class="secao-titulo">3. Quando o S-28-T for revisado</p>
+    <p class="ajuda">
+      Se a Sociedade lançar uma revisão do formulário com itens novos, envie o PDF para quem cuida do app (ou peça para o
+      Claude, se foi assim que este app foi criado) — dá para atualizar o catálogo oficial em poucos minutos.
+    </p>
+
+    <hr />
+
+    <p class="secao-titulo">Restaurar</p>
+    <div class="campo">
+      <button id="btn-restaurar-catalogo" class="botao botao-perigo botao-bloco">Remover todas as publicações extras</button>
+      <p class="ajuda">O catálogo oficial do S-28-T não é afetado, e os números já lançados nas publicações extras removidas não somem do histórico salvo — só deixam de aparecer na lista.</p>
     </div>
   </div>
 </div>
@@ -190,6 +343,7 @@
 <script src="js/lib/jspdf.plugin.autotable.min.js"></script>
 
 <script src="js/firebase-config.js"></script>
+<script src="js/temas.js"></script>
 <script src="js/data.js"></script>
 <script src="js/sync.js"></script>
 <script src="js/export.js"></script>
