@@ -12,7 +12,13 @@
     cicloInicio: "setembro",
     anoServico: String(new Date().getFullYear()),
     itens: {},
+    personalizados: [],
   };
+
+  // Catálogo completo (oficial S-28-T + publicações extras) para o estado atual
+  function catalogoAtual() {
+    return catalogoCompleto(estado.personalizados);
+  }
 
   let mesAtivo = 0;
   let abaAtiva = "lancamento";
@@ -65,6 +71,22 @@
   Sync.definirCallbackStatus(definirStatus);
   window.addEventListener("online", () => definirStatus(Sync.pronto ? "online" : "local"));
   window.addEventListener("offline", () => definirStatus("offline"));
+
+  /* ============================================================ */
+  /* Aparência: paleta de cores, modo escuro, tamanho de fonte      */
+  /* (preferências deste dispositivo — não são sincronizadas)       */
+  /* ============================================================ */
+  Temas.iniciar();
+  Temas.montarSeletorPaletas($("#grade-paletas"));
+
+  $("#btn-tema").addEventListener("click", () => {
+    Temas.aplicarTemaEscuro(!Temas.temaEscuroAtual());
+  });
+  $("#chk-tema-escuro").addEventListener("change", (ev) => {
+    Temas.aplicarTemaEscuro(ev.target.checked);
+  });
+  $("#escala-mais").addEventListener("click", () => Temas.aumentarEscala());
+  $("#escala-menos").addEventListener("click", () => Temas.diminuirEscala());
 
   /* ============================================================ */
   /* Tela de configuração inicial                                  */
@@ -149,6 +171,7 @@
     estado.cicloInicio = dados.cicloInicio || "setembro";
     estado.anoServico = dados.anoServico || String(new Date().getFullYear());
     estado.itens = dados.itens || {};
+    estado.personalizados = Array.isArray(dados.personalizados) ? dados.personalizados : [];
 
     localStorage.setItem(LS_CODIGO, codigo);
     $("#tela-setup").hidden = true;
@@ -197,7 +220,11 @@
       estado.itens[id] = itensRemotos[id];
     });
 
+    const personalizadosMudaram = JSON.stringify(dados.personalizados || []) !== JSON.stringify(estado.personalizados);
+    estado.personalizados = Array.isArray(dados.personalizados) ? dados.personalizados : estado.personalizados;
+
     atualizarCabecalho();
+    if (personalizadosMudaram) construirListaItens();
     atualizarValoresExibidos();
     renderizarVisaoGeral();
   }
@@ -207,33 +234,39 @@
   /* ============================================================ */
   function construirListaItens() {
     const container = $("#categorias");
+    const abertasAntes = new Set($$(".categoria.aberta").map((el) => el.dataset.categoria));
     container.innerHTML = "";
 
-    CATALOGO.forEach((cat, idx) => {
+    catalogoAtual().forEach((cat, idx) => {
       const secao = document.createElement("div");
-      secao.className = "categoria" + (idx === 0 ? " aberta" : "");
+      const jaAberta = abertasAntes.size ? abertasAntes.has(cat.categoria) : idx === 0;
+      secao.className = "categoria" + (jaAberta ? " aberta" : "");
       secao.dataset.categoria = cat.categoria;
 
       secao.innerHTML = `
         <div class="categoria-cabecalho">
-          <div class="categoria-titulo">${cat.categoria} <span class="categoria-contagem">${cat.itens.length} itens</span></div>
-          <svg class="categoria-seta" viewBox="0 0 24 24" width="18" height="18"><path fill="currentColor" d="M7 10l5 5 5-5z"/></svg>
+          <div class="categoria-nome">${cat.categoria}</div>
+          <div class="categoria-direita">
+            <span class="categoria-contagem">${cat.itens.length} itens</span>
+            <svg class="categoria-seta" viewBox="0 0 24 24" width="18" height="18"><path fill="currentColor" d="M7 10l5 5 5-5z"/></svg>
+          </div>
         </div>
         <div class="categoria-itens"></div>
       `;
 
       const listaItens = secao.querySelector(".categoria-itens");
       cat.itens.forEach((it) => {
-        const id = idItem(it.sigla);
+        const id = it.personalizado ? it.id : idItem(it.sigla);
         const cartao = document.createElement("div");
         cartao.className = "item-cartao";
         cartao.dataset.itemId = id;
-        cartao.dataset.busca = normalizarTexto(`${it.titulo} ${it.sigla} ${it.codigo}`);
+        cartao.dataset.busca = normalizarTexto(`${it.titulo} ${it.sigla} ${it.codigo || ""}`);
 
         cartao.innerHTML = `
+          ${it.personalizado ? '<button class="item-remover" data-remover-item title="Remover publicação">×</button>' : ""}
           <div class="item-cabecalho">
-            <div class="item-titulo">${it.titulo}${it.kit ? '<span class="item-kit" title="Kit de Ensino">*</span>' : ""}</div>
-            <div class="item-meta">${it.codigo ? it.codigo + " · " : ""}${it.sigla}</div>
+            <div class="item-titulo">${it.titulo}${it.kit ? '<span class="item-kit" title="Kit de Ensino">*</span>' : ""}${it.personalizado ? '<br/><span class="item-tag-personalizado">extra</span>' : ""}</div>
+            <div class="item-meta">${it.codigo ? it.codigo + " · " : ""}${it.sigla || ""}</div>
           </div>
           <div class="item-campos">
             <div class="campo-mini campo-estoque-anterior">
@@ -257,8 +290,20 @@
         listaItens.appendChild(cartao);
       });
 
+      const botaoAdd = document.createElement("button");
+      botaoAdd.type = "button";
+      botaoAdd.className = "botao-add-item";
+      botaoAdd.dataset.addCategoria = cat.categoria;
+      botaoAdd.innerHTML = `
+        <svg viewBox="0 0 24 24" width="16" height="16"><path fill="currentColor" d="M11 11V5h2v6h6v2h-6v6h-2v-6H5v-2z"/></svg>
+        Adicionar publicação
+      `;
+      listaItens.appendChild(botaoAdd);
+
       container.appendChild(secao);
     });
+
+    if (termoBusca) aplicarFiltroBusca();
   }
 
   // Delegação de eventos configurada uma única vez (o container é reaproveitado
@@ -270,6 +315,16 @@
     const container = $("#categorias");
 
     container.addEventListener("click", (ev) => {
+      const botaoAdd = ev.target.closest("[data-add-categoria]");
+      if (botaoAdd) {
+        abrirModalItem(botaoAdd.dataset.addCategoria);
+        return;
+      }
+      const botaoRemover = ev.target.closest("[data-remover-item]");
+      if (botaoRemover) {
+        removerItemPersonalizado(botaoRemover.closest(".item-cartao").dataset.itemId);
+        return;
+      }
       const cab = ev.target.closest(".categoria-cabecalho");
       if (cab) cab.parentElement.classList.toggle("aberta");
     });
@@ -374,7 +429,7 @@
   }
 
   function atualizarResumoMes() {
-    const lista = listaAchatada();
+    const lista = listaAchatada(estado.personalizados);
     let contados = 0;
     let totalRecebido = 0;
     let totalSaida = 0;
@@ -393,24 +448,91 @@
     });
 
     $("#resumo-mes").innerHTML = `
-      <div class="resumo-cartao">
+      <button type="button" class="resumo-cartao" data-tipo="lancados">
         <div class="rotulo">Itens lançados</div>
         <div class="valor">${contados}/${lista.length}</div>
-      </div>
-      <div class="resumo-cartao">
+      </button>
+      <button type="button" class="resumo-cartao" data-tipo="recebido">
         <div class="rotulo">Total recebido</div>
         <div class="valor">${totalRecebido}</div>
-      </div>
-      <div class="resumo-cartao">
+      </button>
+      <button type="button" class="resumo-cartao" data-tipo="saida">
         <div class="rotulo">Total de saída</div>
         <div class="valor">${totalSaida}</div>
-      </div>
-      <div class="resumo-cartao ${negativos ? "alerta" : ""}">
+      </button>
+      <button type="button" class="resumo-cartao ${negativos ? "alerta" : ""}" data-tipo="revisar">
         <div class="rotulo">Contagens a revisar</div>
         <div class="valor">${negativos}</div>
-      </div>
+      </button>
     `;
   }
+
+  $("#resumo-mes").addEventListener("click", (ev) => {
+    const btn = ev.target.closest(".resumo-cartao");
+    if (btn) abrirDetalhe(btn.dataset.tipo);
+  });
+
+  function abrirDetalhe(tipo) {
+    const lista = listaAchatada(estado.personalizados);
+    const linhas = [];
+    let titulo = "";
+    let intro = "";
+    const mesNome = CICLOS[estado.cicloInicio][mesAtivo];
+
+    if (tipo === "lancados") {
+      titulo = "Itens lançados";
+      intro = `Itens com contagem de estoque já registrada em ${mesNome}.`;
+      lista.forEach((it) => {
+        const itemState = Calc.garantirItem(estado.itens, it.id);
+        const p = itemState.periodos[mesAtivo] || {};
+        if (p.estoque != null) linhas.push({ nome: it.titulo, sigla: it.sigla, valor: `estoque ${p.estoque}` });
+      });
+    } else if (tipo === "recebido") {
+      titulo = "Total recebido";
+      intro = `Itens com quantidade recebida em ${mesNome}.`;
+      lista.forEach((it) => {
+        const itemState = Calc.garantirItem(estado.itens, it.id);
+        const p = itemState.periodos[mesAtivo] || {};
+        if (p.recebido) linhas.push({ nome: it.titulo, sigla: it.sigla, valor: `+${p.recebido}` });
+      });
+    } else if (tipo === "saida") {
+      titulo = "Total de saída";
+      intro = `Saída calculada por item em ${mesNome} (estoque anterior + recebido − estoque contado).`;
+      lista.forEach((it) => {
+        const itemState = Calc.garantirItem(estado.itens, it.id);
+        const s = Calc.saida(itemState, mesAtivo);
+        if (s) linhas.push({ nome: it.titulo, sigla: it.sigla, valor: s, negativo: s < 0 });
+      });
+    } else if (tipo === "revisar") {
+      titulo = "Contagens a revisar";
+      intro = `Itens com saída negativa em ${mesNome} — normalmente sinal de erro de contagem ou de lançamento.`;
+      lista.forEach((it) => {
+        const itemState = Calc.garantirItem(estado.itens, it.id);
+        const s = Calc.saida(itemState, mesAtivo);
+        if (s != null && s < 0) linhas.push({ nome: it.titulo, sigla: it.sigla, valor: s, negativo: true });
+      });
+    }
+
+    $("#detalhe-titulo").textContent = titulo;
+    $("#detalhe-intro").textContent = intro + (linhas.length ? "" : " Nada por aqui ainda.");
+    $("#detalhe-lista").innerHTML = linhas.length
+      ? linhas
+          .map(
+            (l) => `
+        <div class="linha-detalhe ${l.negativo ? "negativo" : ""}">
+          <span class="nome">${l.nome}${l.sigla ? `<span class="sigla">${l.sigla}</span>` : ""}</span>
+          <span class="valor">${l.valor}</span>
+        </div>`
+          )
+          .join("")
+      : '<p class="vazio-detalhe">Nada por aqui ainda.</p>';
+
+    $("#modal-detalhe").hidden = false;
+  }
+  $("#fechar-detalhe").addEventListener("click", () => ($("#modal-detalhe").hidden = true));
+  $("#modal-detalhe").addEventListener("click", (ev) => {
+    if (ev.target.id === "modal-detalhe") $("#modal-detalhe").hidden = true;
+  });
 
   /* ============================================================ */
   /* Cabeçalho / seletor de mês / ciclo                             */
@@ -450,7 +572,7 @@
     );
     if (!ok) return;
 
-    const lista = listaAchatada();
+    const lista = listaAchatada(estado.personalizados);
     const novoItens = {};
     lista.forEach((it) => {
       const atual = Calc.garantirItem(estado.itens, it.id);
@@ -540,13 +662,13 @@
     thead += "</tr></thead>";
 
     let tbody = "<tbody>";
-    CATALOGO.forEach((cat) => {
+    catalogoAtual().forEach((cat) => {
       const totalCols = 2 + meses.length * 3;
       tbody += `<tr class="linha-categoria"><td colspan="${totalCols}">${cat.categoria}</td></tr>`;
       cat.itens.forEach((it) => {
-        const id = idItem(it.sigla);
+        const id = it.personalizado ? it.id : idItem(it.sigla);
         const itemState = Calc.garantirItem(estado.itens, id);
-        tbody += `<tr><td class="nome-item" title="${it.titulo}">${it.titulo}${it.kit ? " *" : ""}</td>`;
+        tbody += `<tr><td class="nome-item" title="${it.titulo}">${it.titulo}${it.kit ? " *" : ""}${it.personalizado ? " (extra)" : ""}</td>`;
         tbody += `<td>${itemState.estoqueAnterior ?? ""}</td>`;
         for (let i = 0; i < meses.length; i++) {
           const p = itemState.periodos[i] || {};
@@ -611,6 +733,198 @@
     if (!confirm("Sair desta congregação neste dispositivo? Você poderá entrar novamente com o código.")) return;
     localStorage.removeItem(LS_CODIGO);
     location.reload();
+  });
+
+  /* ============================================================ */
+  /* Publicações personalizadas (adicionar / remover)              */
+  /* ============================================================ */
+  function abrirModalItem(categoriaPreSelecionada) {
+    const sel = $("#item-categoria");
+    sel.innerHTML = CATALOGO.map((c) => `<option value="${c.categoria}">${c.categoria}</option>`).join("");
+    if (categoriaPreSelecionada) sel.value = categoriaPreSelecionada;
+    $("#item-titulo").value = "";
+    $("#item-sigla").value = "";
+    $("#modal-item").hidden = false;
+    setTimeout(() => $("#item-titulo").focus(), 50);
+  }
+  $("#fechar-item").addEventListener("click", () => ($("#modal-item").hidden = true));
+  $("#modal-item").addEventListener("click", (ev) => {
+    if (ev.target.id === "modal-item") $("#modal-item").hidden = true;
+  });
+
+  $("#form-item").addEventListener("submit", async (ev) => {
+    ev.preventDefault();
+    const titulo = $("#item-titulo").value.trim();
+    if (!titulo) return;
+    const categoria = $("#item-categoria").value;
+    const sigla = $("#item-sigla").value.trim();
+
+    const novo = { id: novoIdPersonalizado(), titulo, categoria, sigla: sigla || "extra", codigo: "", kit: false };
+    estado.personalizados.push(novo);
+    await Sync.salvarPersonalizados(estado.codigo, estado.personalizados);
+    construirListaItens();
+    atualizarValoresExibidos();
+    renderizarVisaoGeral();
+    $("#modal-item").hidden = true;
+    toast(`"${titulo}" adicionado em ${categoria}.`);
+  });
+
+  async function removerItemPersonalizado(id) {
+    const item = estado.personalizados.find((p) => p.id === id);
+    if (!item) return;
+    if (!confirm(`Remover "${item.titulo}" da lista? O catálogo oficial do S-28-T não é afetado.`)) return;
+    estado.personalizados = estado.personalizados.filter((p) => p.id !== id);
+    await Sync.salvarPersonalizados(estado.codigo, estado.personalizados);
+    construirListaItens();
+    atualizarValoresExibidos();
+    renderizarVisaoGeral();
+    toast("Publicação removida.");
+  }
+
+  /* ============================================================ */
+  /* Importar / exportar / restaurar publicações extras (CSV)      */
+  /* ============================================================ */
+  $("#cfg-abrir-importar").addEventListener("click", () => {
+    $("#modal-config").hidden = true;
+    $("#modal-importar").hidden = false;
+  });
+  $("#fechar-importar").addEventListener("click", () => ($("#modal-importar").hidden = true));
+  $("#modal-importar").addEventListener("click", (ev) => {
+    if (ev.target.id === "modal-importar") $("#modal-importar").hidden = true;
+  });
+
+  function escaparCSV(v) {
+    const s = String(v ?? "");
+    return /[",\n]/.test(s) ? '"' + s.replace(/"/g, '""') + '"' : s;
+  }
+
+  function paraCSV(linhas) {
+    const corpo = linhas.map((l) =>
+      [l.categoria, l.titulo, l.sigla, l.codigo, l.kit ? "1" : "0"].map(escaparCSV).join(",")
+    );
+    return ["categoria,titulo,sigla,codigo,kit", ...corpo].join("\n");
+  }
+
+  function baixarArquivo(nome, conteudo, tipo) {
+    const blob = new Blob([conteudo], { type: tipo });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = nome;
+    document.body.appendChild(a);
+    a.click();
+    a.remove();
+    setTimeout(() => URL.revokeObjectURL(url), 2000);
+  }
+
+  $("#btn-exportar-csv").addEventListener("click", () => {
+    const csv = paraCSV(estado.personalizados);
+    baixarArquivo(`publicacoes-extras-${estado.codigo || "app"}.csv`, csv, "text/csv;charset=utf-8");
+  });
+
+  // Parser simples de CSV, com suporte a valores entre aspas (vírgulas/aspas internas)
+  function parseLinhaCSV(linha) {
+    const campos = [];
+    let atual = "";
+    let dentroAspas = false;
+    for (let i = 0; i < linha.length; i++) {
+      const c = linha[i];
+      if (dentroAspas) {
+        if (c === '"' && linha[i + 1] === '"') {
+          atual += '"';
+          i++;
+        } else if (c === '"') {
+          dentroAspas = false;
+        } else {
+          atual += c;
+        }
+      } else if (c === '"') {
+        dentroAspas = true;
+      } else if (c === ",") {
+        campos.push(atual);
+        atual = "";
+      } else {
+        atual += c;
+      }
+    }
+    campos.push(atual);
+    return campos;
+  }
+
+  function parseCSV(texto) {
+    const linhas = texto.split(/\r?\n/).filter((l) => l.trim() !== "");
+    if (linhas.length < 2) return [];
+    const cabecalho = parseLinhaCSV(linhas[0]).map((h) => h.trim().toLowerCase());
+    const idx = {
+      categoria: cabecalho.indexOf("categoria"),
+      titulo: cabecalho.indexOf("titulo"),
+      sigla: cabecalho.indexOf("sigla"),
+      codigo: cabecalho.indexOf("codigo"),
+      kit: cabecalho.indexOf("kit"),
+    };
+    const categoriasValidas = new Set(CATALOGO.map((c) => c.categoria));
+    const resultado = [];
+    for (let i = 1; i < linhas.length; i++) {
+      const campos = parseLinhaCSV(linhas[i]);
+      const titulo = (campos[idx.titulo] ?? "").trim();
+      if (!titulo) continue;
+      let categoria = (campos[idx.categoria] ?? "").trim();
+      if (!categoriasValidas.has(categoria)) categoria = CATALOGO[0].categoria;
+      resultado.push({
+        id: novoIdPersonalizado(),
+        titulo,
+        categoria,
+        sigla: (campos[idx.sigla] ?? "").trim(),
+        codigo: (campos[idx.codigo] ?? "").trim(),
+        kit: /^(1|true|sim|x)$/i.test((campos[idx.kit] ?? "").trim()),
+      });
+    }
+    return resultado;
+  }
+
+  $("#btn-importar-csv").addEventListener("click", async () => {
+    const arquivo = $("#input-importar-csv").files[0];
+    if (!arquivo) {
+      toast("Escolha um arquivo .csv primeiro.");
+      return;
+    }
+    let importados;
+    try {
+      const texto = await arquivo.text();
+      importados = parseCSV(texto);
+    } catch (err) {
+      console.error(err);
+      toast("Não consegui ler esse arquivo.");
+      return;
+    }
+    if (!importados.length) {
+      toast("Não encontrei publicações válidas nesse arquivo.");
+      return;
+    }
+
+    const modo = $("#modo-importar").value;
+    estado.personalizados = modo === "substituir" ? importados : [...estado.personalizados, ...importados];
+
+    await Sync.salvarPersonalizados(estado.codigo, estado.personalizados);
+    construirListaItens();
+    atualizarValoresExibidos();
+    renderizarVisaoGeral();
+    $("#input-importar-csv").value = "";
+    toast(`${importados.length} publicação(ões) importada(s).`);
+  });
+
+  $("#btn-restaurar-catalogo").addEventListener("click", async () => {
+    if (!estado.personalizados.length) {
+      toast("Não há publicações extras cadastradas.");
+      return;
+    }
+    if (!confirm("Remover todas as publicações extras cadastradas? O catálogo oficial do S-28-T não é afetado.")) return;
+    estado.personalizados = [];
+    await Sync.salvarPersonalizados(estado.codigo, estado.personalizados);
+    construirListaItens();
+    atualizarValoresExibidos();
+    renderizarVisaoGeral();
+    toast("Publicações extras removidas.");
   });
 
   /* ============================================================ */

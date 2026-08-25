@@ -139,6 +139,7 @@ const Sync = (() => {
       cicloInicio: cicloInicio || "setembro",
       anoServico: anoServico || String(new Date().getFullYear()),
       itens: {},
+      personalizados: [],
       atualizadoEm: pronto ? firebase.firestore.FieldValue.serverTimestamp() : Date.now(),
     };
     if (pronto) {
@@ -198,6 +199,20 @@ const Sync = (() => {
       });
   }
 
+  async function salvarPersonalizados(codigo, lista) {
+    const cod = normalizarCodigo(codigo);
+    if (!pronto) {
+      const atual = lerLocal(cod) || {};
+      atual.personalizados = lista;
+      gravarLocal(cod, atual);
+      return;
+    }
+    await db
+      .collection("congregacoes")
+      .doc(cod)
+      .set({ personalizados: lista, atualizadoEm: firebase.firestore.FieldValue.serverTimestamp() }, { merge: true });
+  }
+
   async function arquivarCiclo(codigo, snapshot) {
     const cod = normalizarCodigo(codigo);
     if (!pronto) {
@@ -217,13 +232,14 @@ const Sync = (() => {
     });
   }
 
-  async function salvarTudo(codigo, { nome, cicloInicio, anoServico, itens }) {
+  async function salvarTudo(codigo, { nome, cicloInicio, anoServico, itens, personalizados }) {
     const cod = normalizarCodigo(codigo);
     const dados = {
       nome,
       cicloInicio,
       anoServico,
       itens,
+      personalizados: personalizados || [],
       atualizadoEm: pronto ? firebase.firestore.FieldValue.serverTimestamp() : Date.now(),
     };
     if (pronto) {
@@ -262,6 +278,7 @@ const Sync = (() => {
     criarCongregacao,
     salvarConfig,
     salvarItem,
+    salvarPersonalizados,
     arquivarCiclo,
     salvarTudo,
     ouvir,

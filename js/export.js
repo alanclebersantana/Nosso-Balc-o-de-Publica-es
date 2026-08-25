@@ -19,7 +19,7 @@ const Exportar = (() => {
     doc.setFont("helvetica", "bold");
     doc.setFontSize(13);
     doc.setTextColor(18, 64, 95);
-    doc.text("Movimento Mensal de Publicações", margem, 13);
+    doc.text("Nosso Balcão Publicações — Movimento Mensal", margem, 13);
 
     doc.setFont("helvetica", "normal");
     doc.setFontSize(9);
@@ -49,7 +49,7 @@ const Exportar = (() => {
     const totalColunas = 3 + meses.length * 3;
     const body = [];
 
-    CATALOGO.forEach((cat) => {
+    catalogoCompleto(estado.personalizados).forEach((cat) => {
       body.push([
         {
           content: cat.categoria,
@@ -59,11 +59,11 @@ const Exportar = (() => {
       ]);
 
       cat.itens.forEach((it) => {
-        const id = idItem(it.sigla);
+        const id = it.personalizado ? it.id : idItem(it.sigla);
         const itemState = Calc.garantirItem(estado.itens, id);
         const linha = [
-          it.titulo + (it.kit ? " *" : ""),
-          it.codigo ? `${it.codigo} · ${it.sigla}` : it.sigla,
+          it.titulo + (it.kit ? " *" : "") + (it.personalizado ? " (extra)" : ""),
+          it.codigo ? `${it.codigo} · ${it.sigla}` : it.sigla || "",
           { content: formatarNumero(itemState.estoqueAnterior), styles: { halign: "center" } },
         ];
         for (let i = 0; i < meses.length; i++) {
