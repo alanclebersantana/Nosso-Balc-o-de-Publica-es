@@ -1,0 +1,198 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+<title>Publicações — Controle de Movimento</title>
+<meta name="description" content="Controle de movimento mensal de publicações (S-28-T) com cálculo automático de estoque, entrada e saída." />
+
+<meta name="theme-color" content="#12405f" />
+<meta name="mobile-web-app-capable" content="yes" />
+<meta name="apple-mobile-web-app-capable" content="yes" />
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+<meta name="apple-mobile-web-app-title" content="Publicações" />
+
+<link rel="manifest" href="manifest.json" />
+<link rel="icon" href="icons/favicon-32.png" sizes="32x32" />
+<link rel="icon" href="icons/icon-192.png" sizes="192x192" />
+<link rel="apple-touch-icon" href="icons/apple-touch-icon.png" />
+
+<link rel="stylesheet" href="css/style.css" />
+</head>
+<body>
+
+<!-- ============================================================ -->
+<!-- Tela de configuração inicial (código da congregação)          -->
+<!-- ============================================================ -->
+<div id="tela-setup" class="overlay" hidden>
+  <div class="cartao-setup">
+    <div class="logo-setup">
+      <img src="icons/icon-96.png" alt="" width="56" height="56" />
+      <h1>Publicações</h1>
+    </div>
+    <p class="subtitulo">Controle de movimento mensal de publicações, com base no formulário S-28-T.</p>
+
+    <form id="form-setup">
+      <label for="input-codigo">Código da congregação</label>
+      <input id="input-codigo" type="text" inputmode="text" autocomplete="off" autocapitalize="off"
+             placeholder="ex.: jardim-esperanca-pt" required />
+      <p class="ajuda">Combine este código com as outras pessoas que vão lançar dados. Quem usar o mesmo código compartilha o mesmo estoque, em tempo real.</p>
+
+      <div id="bloco-nova-congregacao" hidden>
+        <label for="input-nome">Nome da congregação</label>
+        <input id="input-nome" type="text" placeholder="ex.: Congregação Jardim Esperança" />
+
+        <label for="input-ciclo">Este formulário começa em</label>
+        <select id="input-ciclo">
+          <option value="setembro">Setembro (1ª metade do ano de serviço)</option>
+          <option value="marco">Março (2ª metade do ano de serviço)</option>
+        </select>
+
+        <label for="input-ano">Ano de serviço</label>
+        <input id="input-ano" type="text" placeholder="ex.: 2026" />
+      </div>
+
+      <button type="submit" id="btn-entrar" class="botao botao-primario botao-bloco">Entrar</button>
+    </form>
+    <p id="setup-erro" class="erro" hidden></p>
+    <p class="rodape-setup">Os dados ficam salvos com segurança e sincronizam automaticamente entre os dispositivos que usarem o mesmo código.</p>
+  </div>
+</div>
+
+<!-- ============================================================ -->
+<!-- Aplicativo principal                                          -->
+<!-- ============================================================ -->
+<div id="app" hidden>
+
+  <header class="topo">
+    <div class="topo-linha">
+      <div class="marca">
+        <img src="icons/icon-96.png" alt="" width="30" height="30" />
+        <div class="marca-texto">
+          <strong>Publicações</strong>
+          <span id="nome-congregacao">—</span>
+        </div>
+      </div>
+
+      <div class="topo-acoes">
+        <button id="btn-instalar" class="chip chip-acao" hidden title="Instalar aplicativo">
+          <svg viewBox="0 0 24 24" width="16" height="16"><path fill="currentColor" d="M12 3v10.6l3.3-3.3 1.4 1.4L12 17.4l-4.7-4.7 1.4-1.4 3.3 3.3V3h2zM5 19h14v2H5z"/></svg>
+          Instalar
+        </button>
+        <button id="status-sync" class="chip chip-status" title="Estado da sincronização">
+          <span class="ponto"></span><span id="status-texto">conectando…</span>
+        </button>
+        <button id="btn-config" class="botao-icone" title="Configurações">
+          <svg viewBox="0 0 24 24" width="20" height="20"><path fill="currentColor" d="M19.4 13a7.5 7.5 0 000-2l2-1.6-2-3.4-2.4 1a7.6 7.6 0 00-1.7-1L15 3h-6l-.3 2.7a7.6 7.6 0 00-1.7 1l-2.4-1-2 3.4L4.6 11a7.5 7.5 0 000 2l-2 1.6 2 3.4 2.4-1a7.6 7.6 0 001.7 1L9 21h6l.3-2.7a7.6 7.6 0 001.7-1l2.4 1 2-3.4-2-1.6zM12 15.5A3.5 3.5 0 1112 8.5a3.5 3.5 0 010 7z"/></svg>
+        </button>
+      </div>
+    </div>
+
+    <nav class="abas">
+      <button class="aba ativa" data-aba="lancamento">Lançamento do mês</button>
+      <button class="aba" data-aba="visaogeral">Visão geral</button>
+    </nav>
+  </header>
+
+  <!-- ------------------ Barra de controle (lançamento) ------------------ -->
+  <div class="barra-controle" id="barra-lancamento">
+    <div class="controle-grupo">
+      <label>Ciclo</label>
+      <select id="sel-ciclo">
+        <option value="setembro">Set. – Fev.</option>
+        <option value="marco">Mar. – Ago.</option>
+      </select>
+    </div>
+    <div class="controle-grupo">
+      <label>Mês em edição</label>
+      <select id="sel-mes"></select>
+    </div>
+    <div class="controle-grupo controle-busca">
+      <label for="input-busca">Buscar</label>
+      <input id="input-busca" type="search" placeholder="Nome, sigla ou código do item…" />
+    </div>
+  </div>
+
+  <!-- ------------------ Conteúdo: lançamento por item ------------------ -->
+  <main id="conteudo-lancamento" class="conteudo">
+    <div id="resumo-mes" class="resumo-mes"></div>
+    <div id="categorias"></div>
+  </main>
+
+  <!-- ------------------ Conteúdo: visão geral (tabela) ------------------ -->
+  <main id="conteudo-visaogeral" class="conteudo" hidden>
+    <div class="visaogeral-cabecalho">
+      <div>
+        <h2>Visão geral — <span id="vg-ciclo-label"></span></h2>
+        <p id="vg-info" class="ajuda"></p>
+      </div>
+    </div>
+    <div class="tabela-scroll">
+      <table id="tabela-visaogeral" class="tabela-vg"></table>
+    </div>
+  </main>
+
+  <button id="btn-exportar" class="fab" title="Exportar PDF preenchido">
+    <svg viewBox="0 0 24 24" width="22" height="22"><path fill="currentColor" d="M6 2h9l5 5v13a2 2 0 01-2 2H6a2 2 0 01-2-2V4a2 2 0 012-2zm8 1.5V8h4.5L14 3.5zM8 13h8v1.5H8V13zm0 3h8v1.5H8V16zm0-6h4v1.5H8V10z"/></svg>
+    <span>Exportar PDF</span>
+  </button>
+</div>
+
+<!-- ============================================================ -->
+<!-- Modal de configurações                                        -->
+<!-- ============================================================ -->
+<div id="modal-config" class="overlay" hidden>
+  <div class="cartao-modal">
+    <div class="cartao-modal-topo">
+      <h2>Configurações</h2>
+      <button id="fechar-config" class="botao-icone" aria-label="Fechar">
+        <svg viewBox="0 0 24 24" width="20" height="20"><path fill="currentColor" d="M6.4 4.9L4.9 6.4 10.6 12l-5.7 5.6 1.5 1.5L12 13.4l5.6 5.7 1.5-1.5L13.4 12l5.7-5.6-1.5-1.5L12 10.6z"/></svg>
+      </button>
+    </div>
+
+    <div class="campo">
+      <label>Código da congregação</label>
+      <div class="linha-copia">
+        <input id="cfg-codigo" type="text" readonly />
+        <button id="cfg-copiar" class="botao botao-secundario">Copiar</button>
+      </div>
+      <p class="ajuda">Compartilhe este código com quem também vai lançar dados — todos verão as mesmas informações, em tempo real.</p>
+    </div>
+
+    <div class="campo">
+      <label for="cfg-nome">Nome da congregação</label>
+      <input id="cfg-nome" type="text" />
+    </div>
+
+    <div class="campo">
+      <label for="cfg-ano">Ano de serviço</label>
+      <input id="cfg-ano" type="text" />
+    </div>
+
+    <div class="campo">
+      <button id="cfg-salvar" class="botao botao-primario botao-bloco">Salvar alterações</button>
+    </div>
+
+    <hr />
+
+    <div class="campo">
+      <button id="cfg-trocar" class="botao botao-secundario botao-bloco">Sair / trocar de congregação</button>
+    </div>
+  </div>
+</div>
+
+<div id="toast" class="toast" hidden></div>
+
+<script src="js/lib/firebase/firebase-app-compat.js"></script>
+<script src="js/lib/firebase/firebase-auth-compat.js"></script>
+<script src="js/lib/firebase/firebase-firestore-compat.js"></script>
+<script src="js/lib/jspdf.umd.min.js"></script>
+<script src="js/lib/jspdf.plugin.autotable.min.js"></script>
+
+<script src="js/firebase-config.js"></script>
+<script src="js/data.js"></script>
+<script src="js/sync.js"></script>
+<script src="js/export.js"></script>
+<script src="js/app.js"></script>
+</body>
+</html>
