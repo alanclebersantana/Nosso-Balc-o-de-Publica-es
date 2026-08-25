@@ -13,11 +13,12 @@
     anoServico: String(new Date().getFullYear()),
     itens: {},
     personalizados: [],
+    catalogoOficial: null, // não-nulo depois que a congregação importa uma revisão nova do S-28-T
   };
 
   // Catálogo completo (oficial S-28-T + publicações extras) para o estado atual
   function catalogoAtual() {
-    return catalogoCompleto(estado.personalizados);
+    return catalogoCompleto(estado.personalizados, estado.catalogoOficial);
   }
 
   let mesAtivo = 0;
@@ -92,9 +93,32 @@
   /* Tela de configuração inicial                                  */
   /* ============================================================ */
   let congregacaoNovaPendente = false;
+  let jaEntrouNoApp = false; // true depois do primeiro login bem-sucedido nesta sessão
+  let saindoDeContaManualmente = false; // evita recarregar 2x quando o próprio botão "Sair da conta" já cuida disso
 
   async function iniciarApp() {
     await Sync.inicializar();
+
+    if (Sync.configurado && !Sync.usuarioAtual()) {
+      mostrarTelaLogin();
+      return;
+    }
+    await continuarAposLogin();
+  }
+
+  // Se a sessão cair depois de já termos entrado no app (ex.: senha alterada
+  // em outro dispositivo), volta para a tela de login em vez de travar.
+  Sync.definirCallbackAuth((user) => {
+    if (!user && jaEntrouNoApp && Sync.configurado && !saindoDeContaManualmente) {
+      location.reload();
+    }
+  });
+
+  async function continuarAposLogin() {
+    jaEntrouNoApp = true;
+    $("#tela-login").hidden = true;
+    atualizarSecaoConta();
+
     const codigoSalvo = localStorage.getItem(LS_CODIGO);
     if (codigoSalvo) {
       const r = await Sync.buscarCongregacao(codigoSalvo);
@@ -110,6 +134,78 @@
     $("#tela-setup").hidden = false;
     definirStatus(Sync.pronto ? "conectando" : "local");
   }
+
+  function atualizarSecaoConta() {
+    const usuario = Sync.usuarioAtual();
+    $("#cfg-secao-conta").hidden = !usuario;
+    if (usuario) $("#cfg-email-conta").value = usuario.email || "";
+  }
+
+  /* ---- Tela de login (e-mail e senha) ---- */
+  let modoLoginCriarConta = false;
+
+  function mostrarTelaLogin() {
+    modoLoginCriarConta = false;
+    atualizarTextoLogin();
+    $("#login-email").value = "";
+    $("#login-senha").value = "";
+    $("#login-erro").hidden = true;
+    $("#tela-login").hidden = false;
+  }
+
+  function atualizarTextoLogin() {
+    $("#login-titulo-modo").textContent = modoLoginCriarConta ? "Criar conta" : "Entrar na conta";
+    $("#btn-login-enviar").textContent = modoLoginCriarConta ? "Criar conta" : "Entrar";
+    $("#link-alternar-login").textContent = modoLoginCriarConta ? "Já tem conta? Entrar" : "Não tem conta? Criar uma";
+    $("#login-erro").hidden = true;
+  }
+
+  $("#link-alternar-login").addEventListener("click", (ev) => {
+    ev.preventDefault();
+    modoLoginCriarConta = !modoLoginCriarConta;
+    atualizarTextoLogin();
+  });
+
+  $("#link-esqueci-senha").addEventListener("click", async (ev) => {
+    ev.preventDefault();
+    const email = $("#login-email").value.trim();
+    if (!email) {
+      $("#login-erro").textContent = 'Digite seu e-mail acima e depois toque em "Esqueci minha senha".';
+      $("#login-erro").hidden = false;
+      return;
+    }
+    const r = await Sync.redefinirSenha(email);
+    if (r.ok) {
+      toast("Enviamos um link de redefinição de senha para " + email + ".", 4000);
+    } else {
+      $("#login-erro").textContent = r.mensagem;
+      $("#login-erro").hidden = false;
+    }
+  });
+
+  $("#form-login").addEventListener("submit", async (ev) => {
+    ev.preventDefault();
+    const email = $("#login-email").value.trim();
+    const senha = $("#login-senha").value;
+    const btn = $("#btn-login-enviar");
+    $("#login-erro").hidden = true;
+    btn.disabled = true;
+    btn.textContent = modoLoginCriarConta ? "Criando conta…" : "Entrando…";
+
+    const r = modoLoginCriarConta
+      ? await Sync.criarContaComEmail(email, senha)
+      : await Sync.entrarComEmail(email, senha);
+
+    btn.disabled = false;
+    atualizarTextoLogin();
+
+    if (!r.ok) {
+      $("#login-erro").textContent = r.mensagem;
+      $("#login-erro").hidden = false;
+      return;
+    }
+    await continuarAposLogin();
+  });
 
   $("#input-codigo").addEventListener("input", () => {
     // Se o código for editado depois de já termos verificado outro código,
@@ -172,6 +268,7 @@
     estado.anoServico = dados.anoServico || String(new Date().getFullYear());
     estado.itens = dados.itens || {};
     estado.personalizados = Array.isArray(dados.personalizados) ? dados.personalizados : [];
+    estado.catalogoOficial = Array.isArray(dados.catalogoOficial) && dados.catalogoOficial.length ? dados.catalogoOficial : null;
 
     localStorage.setItem(LS_CODIGO, codigo);
     $("#tela-setup").hidden = true;
@@ -183,6 +280,7 @@
     atualizarCabecalho();
     atualizarValoresExibidos();
     renderizarVisaoGeral();
+    atualizarVisibilidadeRestaurarCatalogo();
 
     if (pararDeOuvir) pararDeOuvir();
     if (Sync.pronto) {
@@ -223,10 +321,15 @@
     const personalizadosMudaram = JSON.stringify(dados.personalizados || []) !== JSON.stringify(estado.personalizados);
     estado.personalizados = Array.isArray(dados.personalizados) ? dados.personalizados : estado.personalizados;
 
+    const novoCatalogoOficial = Array.isArray(dados.catalogoOficial) && dados.catalogoOficial.length ? dados.catalogoOficial : null;
+    const catalogoOficialMudou = JSON.stringify(novoCatalogoOficial) !== JSON.stringify(estado.catalogoOficial);
+    estado.catalogoOficial = novoCatalogoOficial;
+
     atualizarCabecalho();
-    if (personalizadosMudaram) construirListaItens();
+    if (personalizadosMudaram || catalogoOficialMudou) construirListaItens();
     atualizarValoresExibidos();
     renderizarVisaoGeral();
+    if (catalogoOficialMudou) atualizarVisibilidadeRestaurarCatalogo();
   }
 
   /* ============================================================ */
@@ -429,7 +532,7 @@
   }
 
   function atualizarResumoMes() {
-    const lista = listaAchatada(estado.personalizados);
+    const lista = listaAchatada(estado.personalizados, estado.catalogoOficial);
     let contados = 0;
     let totalRecebido = 0;
     let totalSaida = 0;
@@ -473,7 +576,7 @@
   });
 
   function abrirDetalhe(tipo) {
-    const lista = listaAchatada(estado.personalizados);
+    const lista = listaAchatada(estado.personalizados, estado.catalogoOficial);
     const linhas = [];
     let titulo = "";
     let intro = "";
@@ -572,7 +675,7 @@
     );
     if (!ok) return;
 
-    const lista = listaAchatada(estado.personalizados);
+    const lista = listaAchatada(estado.personalizados, estado.catalogoOficial);
     const novoItens = {};
     lista.forEach((it) => {
       const atual = Calc.garantirItem(estado.itens, it.id);
@@ -664,7 +767,12 @@
     let tbody = "<tbody>";
     catalogoAtual().forEach((cat) => {
       const totalCols = 2 + meses.length * 3;
-      tbody += `<tr class="linha-categoria"><td colspan="${totalCols}">${cat.categoria}</td></tr>`;
+      // Evita "colspan" na célula fixa à esquerda: alguns navegadores não
+      // conseguem manter "position: sticky" funcionando numa célula que
+      // também usa colspan, então a linha da categoria é montada com uma
+      // célula "nome-item" normal (fixa, igual às demais linhas) seguida de
+      // células vazias que só preenchem a cor de fundo até o fim da linha.
+      tbody += `<tr class="linha-categoria"><td class="nome-item">${cat.categoria}</td>${"<td></td>".repeat(totalCols - 1)}</tr>`;
       cat.itens.forEach((it) => {
         const id = it.personalizado ? it.id : idItem(it.sigla);
         const itemState = Calc.garantirItem(estado.itens, id);
@@ -732,6 +840,18 @@
   $("#cfg-trocar").addEventListener("click", () => {
     if (!confirm("Sair desta congregação neste dispositivo? Você poderá entrar novamente com o código.")) return;
     localStorage.removeItem(LS_CODIGO);
+    location.reload();
+  });
+
+  $("#cfg-sair-conta").addEventListener("click", async () => {
+    if (!confirm("Sair da sua conta neste dispositivo?")) return;
+    saindoDeContaManualmente = true;
+    if (pararDeOuvir) pararDeOuvir();
+    await Sync.sairDaConta();
+    // Mantém o código da congregação salvo (só o login é encerrado) — ao entrar
+    // de novo com uma conta, este dispositivo volta direto para a mesma
+    // congregação. Quem quiser trocar de congregação usa "Sair / trocar de
+    // congregação" acima, que é quem limpa o código.
     location.reload();
   });
 
@@ -925,6 +1045,107 @@
     atualizarValoresExibidos();
     renderizarVisaoGeral();
     toast("Publicações extras removidas.");
+  });
+
+  /* ============================================================ */
+  /* Atualizar catálogo oficial (nova revisão do S-28-T)           */
+  /* ============================================================ */
+  // Mesmo formato de CSV usado para publicações extras, mas aqui vale para
+  // qualquer categoria (não só as já conhecidas) e a sigla é obrigatória —
+  // é ela que decide quais itens são "os mesmos" na revisão nova.
+  function parseCSVCatalogoOficial(texto) {
+    const linhas = texto.split(/\r?\n/).filter((l) => l.trim() !== "");
+    if (linhas.length < 2) return { itens: [], semSigla: 0 };
+    const cabecalho = parseLinhaCSV(linhas[0]).map((h) => h.trim().toLowerCase());
+    const idx = {
+      categoria: cabecalho.indexOf("categoria"),
+      titulo: cabecalho.indexOf("titulo"),
+      sigla: cabecalho.indexOf("sigla"),
+      codigo: cabecalho.indexOf("codigo"),
+      kit: cabecalho.indexOf("kit"),
+    };
+    const itens = [];
+    let semSigla = 0;
+    for (let i = 1; i < linhas.length; i++) {
+      const campos = parseLinhaCSV(linhas[i]);
+      const titulo = (campos[idx.titulo] ?? "").trim();
+      const sigla = (campos[idx.sigla] ?? "").trim();
+      if (!titulo) continue;
+      if (!sigla) {
+        semSigla++;
+        continue; // sem sigla não dá pra casar com os dados já lançados com segurança
+      }
+      itens.push({
+        titulo,
+        categoria: (campos[idx.categoria] ?? "").trim() || "Outros",
+        sigla,
+        codigo: (campos[idx.codigo] ?? "").trim(),
+        kit: /^(1|true|sim|x)$/i.test((campos[idx.kit] ?? "").trim()),
+      });
+    }
+    return { itens, semSigla };
+  }
+
+  function atualizarVisibilidadeRestaurarCatalogo() {
+    $("#btn-restaurar-catalogo-oficial").hidden = !estado.catalogoOficial;
+  }
+
+  $("#btn-importar-catalogo").addEventListener("click", async () => {
+    const arquivo = $("#input-importar-catalogo").files[0];
+    if (!arquivo) {
+      toast("Escolha um arquivo .csv primeiro.");
+      return;
+    }
+    let itens, semSigla;
+    try {
+      const texto = await arquivo.text();
+      ({ itens, semSigla } = parseCSVCatalogoOficial(texto));
+    } catch (err) {
+      console.error(err);
+      toast("Não consegui ler esse arquivo.");
+      return;
+    }
+    if (!itens.length) {
+      toast("Não encontrei publicações válidas (com sigla) nesse arquivo.");
+      return;
+    }
+
+    const idsAtuais = new Set(listaAchatada(estado.personalizados, estado.catalogoOficial).filter((it) => !it.personalizado).map((it) => it.id));
+    const idsNovos = new Set(itens.map((it) => idItem(it.sigla)));
+    let mantidos = 0;
+    idsNovos.forEach((id) => { if (idsAtuais.has(id)) mantidos++; });
+    const novosItens = idsNovos.size - mantidos;
+    let removidos = 0;
+    idsAtuais.forEach((id) => { if (!idsNovos.has(id)) removidos++; });
+
+    const aviso =
+      `Atualizar o catálogo oficial com ${itens.length} publicação(ões)?\n\n` +
+      `${mantidos} continuam as mesmas (os dados já lançados aparecem automaticamente).\n` +
+      `${novosItens} são novas (começam sem histórico).\n` +
+      (removidos ? `${removidos} saem da lista ativa (os dados já lançados ficam guardados, nada é apagado).\n` : "") +
+      (semSigla ? `\n${semSigla} linha(s) do arquivo foram ignoradas por não terem sigla.` : "");
+    if (!confirm(aviso)) return;
+
+    const novoCatalogoOficial = agruparPorCategoria(itens, estado.catalogoOficial || CATALOGO);
+    estado.catalogoOficial = novoCatalogoOficial;
+    await Sync.salvarCatalogoOficial(estado.codigo, novoCatalogoOficial);
+    construirListaItens();
+    atualizarValoresExibidos();
+    renderizarVisaoGeral();
+    atualizarVisibilidadeRestaurarCatalogo();
+    $("#input-importar-catalogo").value = "";
+    toast("Catálogo oficial atualizado.");
+  });
+
+  $("#btn-restaurar-catalogo-oficial").addEventListener("click", async () => {
+    if (!confirm("Voltar para o catálogo oficial padrão do app? A lista importada deixa de valer (os dados já lançados continuam guardados).")) return;
+    estado.catalogoOficial = null;
+    await Sync.salvarCatalogoOficial(estado.codigo, null);
+    construirListaItens();
+    atualizarValoresExibidos();
+    renderizarVisaoGeral();
+    atualizarVisibilidadeRestaurarCatalogo();
+    toast("Catálogo oficial padrão restaurado.");
   });
 
   /* ============================================================ */

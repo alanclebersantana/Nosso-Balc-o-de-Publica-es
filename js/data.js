@@ -153,12 +153,19 @@ function idItem(sigla) {
   return "item_" + sigla.replace(/[^a-zA-Z0-9_.-]/g, "_");
 }
 
-// Catálogo completo = catálogo padrão do S-28-T + publicações personalizadas
+// Catálogo completo = catálogo oficial do S-28-T + publicações personalizadas
 // que a congregação tiver adicionado, já agrupadas dentro da categoria certa.
 // `itensPersonalizados` é um array de { id, titulo, sigla, codigo, categoria, kit }.
-function catalogoCompleto(itensPersonalizados) {
+// `catalogoOficialCustom`, se vier preenchido (array no mesmo formato de
+// CATALOGO), substitui o catálogo oficial embutido no código — é o que
+// acontece depois que a congregação importa uma revisão nova do formulário
+// (ver "Atualizar catálogo oficial" nas configurações). Continua usando o
+// mesmo id (derivado da sigla) para cada item, então os dados já lançados
+// nos itens que continuam existindo na revisão nova aparecem automaticamente.
+function catalogoCompleto(itensPersonalizados, catalogoOficialCustom) {
   const personalizados = Array.isArray(itensPersonalizados) ? itensPersonalizados : [];
-  return CATALOGO.map((cat) => ({
+  const base = Array.isArray(catalogoOficialCustom) && catalogoOficialCustom.length ? catalogoOficialCustom : CATALOGO;
+  return base.map((cat) => ({
     categoria: cat.categoria,
     icone: cat.icone,
     itens: [
@@ -171,16 +178,46 @@ function catalogoCompleto(itensPersonalizados) {
 }
 
 // Lista "achatada" de todos os itens, com id e categoria embutidos.
-// Passe a lista de personalizados para incluí-los também.
-function listaAchatada(itensPersonalizados) {
+// Passe a lista de personalizados (e, opcionalmente, o catálogo oficial
+// customizado) para incluí-los também.
+function listaAchatada(itensPersonalizados, catalogoOficialCustom) {
   const lista = [];
-  catalogoCompleto(itensPersonalizados).forEach((cat) => {
+  catalogoCompleto(itensPersonalizados, catalogoOficialCustom).forEach((cat) => {
     cat.itens.forEach((it) => {
       const id = it.personalizado ? it.id : idItem(it.sigla);
       lista.push({ ...it, id, categoria: cat.categoria });
     });
   });
   return lista;
+}
+
+// Agrupa uma lista "achatada" de itens { categoria, sigla, titulo, codigo, kit }
+// (por exemplo, vinda de um CSV importado) de volta no formato de CATALOGO
+// (array de categorias, cada uma com sua lista de itens), preservando a
+// ordem original das categorias quando possível e mantendo categorias novas
+// no fim.
+function agruparPorCategoria(itensLista, categoriasBase) {
+  const ordemBase = (categoriasBase && categoriasBase.length ? categoriasBase : CATALOGO).map((c) => c.categoria);
+  const iconesBase = {};
+  (categoriasBase && categoriasBase.length ? categoriasBase : CATALOGO).forEach((c) => (iconesBase[c.categoria] = c.icone));
+
+  const porCategoria = new Map();
+  itensLista.forEach((it) => {
+    const cat = it.categoria || ordemBase[0] || "Outros";
+    if (!porCategoria.has(cat)) porCategoria.set(cat, []);
+    porCategoria.get(cat).push({ codigo: it.codigo || "", sigla: it.sigla || "", titulo: it.titulo, kit: !!it.kit });
+  });
+
+  const categoriasOrdenadas = [
+    ...ordemBase.filter((c) => porCategoria.has(c)),
+    ...Array.from(porCategoria.keys()).filter((c) => !ordemBase.includes(c)),
+  ];
+
+  return categoriasOrdenadas.map((categoria) => ({
+    categoria,
+    icone: iconesBase[categoria] || "book",
+    itens: porCategoria.get(categoria),
+  }));
 }
 
 function novoIdPersonalizado() {
@@ -227,5 +264,5 @@ const Calc = {
 };
 
 if (typeof module !== "undefined") {
-  module.exports = { CATALOGO, CICLOS, idItem, listaAchatada, catalogoCompleto, novoIdPersonalizado, Calc };
+  module.exports = { CATALOGO, CICLOS, idItem, listaAchatada, catalogoCompleto, agruparPorCategoria, novoIdPersonalizado, Calc };
 }

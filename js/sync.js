@@ -16,7 +16,10 @@
 const Sync = (() => {
   let db = null;
   let auth = null;
-  let pronto = false;
+  let pronto = false; // true só quando o Firebase está configurado E há alguém autenticado
+  let configurado = false; // true assim que o Firebase foi inicializado (independente de login)
+  let usuario = null; // objeto do Firebase Auth do usuário logado (ou null)
+  let authResolvido = false;
   let prontoPromise = null;
 
   function normalizarCodigo(txt) {
@@ -73,6 +76,7 @@ const Sync = (() => {
           "[Publicações] Firebase não configurado — rodando em modo local " +
             "(sem sincronização entre dispositivos). Preencha js/firebase-config.js."
         );
+        configurado = false;
         pronto = false;
         resolve(false);
         return;
@@ -82,31 +86,105 @@ const Sync = (() => {
         firebase.initializeApp(FIREBASE_CONFIG);
         db = firebase.firestore();
         auth = firebase.auth();
+        configurado = true;
 
         db.enablePersistence({ synchronizeTabs: true }).catch((err) => {
           console.warn("[Publicações] Persistência offline indisponível:", err.code);
         });
 
+        // Não fazemos mais login anônimo automático — o app pede e-mail/senha
+        // (tela de login) antes de liberar o acesso aos dados. Aqui só
+        // observamos o estado de autenticação e refletimos no app.
         auth.onAuthStateChanged((user) => {
-          if (!user) {
-            auth.signInAnonymously().catch((err) => {
-              console.error("[Publicações] Falha no login anônimo:", err);
-              pronto = false;
-              resolve(false);
-            });
-          } else {
-            pronto = true;
-            resolve(true);
+          usuario = user;
+          pronto = !!user;
+          UI_AuthMudou && UI_AuthMudou(user);
+          if (!authResolvido) {
+            authResolvido = true;
+            resolve(true); // Firebase configurado; já sabemos se há alguém logado (usuario pode ser null)
           }
         });
       } catch (err) {
         console.error("[Publicações] Erro ao iniciar Firebase:", err);
+        configurado = false;
         pronto = false;
         resolve(false);
       }
     });
 
     return prontoPromise;
+  }
+
+  /* ------------------------------------------------------------------------
+     Autenticação por e-mail e senha.
+     ------------------------------------------------------------------------ */
+  function mensagemErroAuth(err) {
+    const codigo = err && err.code;
+    const mapa = {
+      "auth/invalid-email": "E-mail inválido.",
+      "auth/missing-password": "Digite uma senha.",
+      "auth/user-not-found": "Não existe conta com esse e-mail.",
+      "auth/wrong-password": "Senha incorreta.",
+      "auth/invalid-credential": "E-mail ou senha incorretos.",
+      "auth/invalid-login-credentials": "E-mail ou senha incorretos.",
+      "auth/email-already-in-use": "Já existe uma conta com esse e-mail — tente entrar em vez de criar uma nova.",
+      "auth/weak-password": "A senha precisa ter pelo menos 6 caracteres.",
+      "auth/too-many-requests": "Muitas tentativas seguidas. Aguarde um pouco e tente de novo.",
+      "auth/network-request-failed": "Sem conexão com a internet. Verifique e tente novamente.",
+      "auth/operation-not-allowed": "O login por e-mail/senha não está ativado neste projeto Firebase (ative em Authentication → Sign-in method).",
+    };
+    return mapa[codigo] || "Não foi possível concluir. Tente novamente.";
+  }
+
+  async function entrarComEmail(email, senha) {
+    await inicializar();
+    if (!configurado) return { ok: false, mensagem: "Sincronização não configurada (modo local)." };
+    try {
+      const cred = await auth.signInWithEmailAndPassword(String(email || "").trim(), senha);
+      return { ok: true, usuario: cred.user };
+    } catch (err) {
+      console.error("[Publicações] Falha ao entrar:", err);
+      return { ok: false, mensagem: mensagemErroAuth(err) };
+    }
+  }
+
+  async function criarContaComEmail(email, senha) {
+    await inicializar();
+    if (!configurado) return { ok: false, mensagem: "Sincronização não configurada (modo local)." };
+    try {
+      const cred = await auth.createUserWithEmailAndPassword(String(email || "").trim(), senha);
+      return { ok: true, usuario: cred.user };
+    } catch (err) {
+      console.error("[Publicações] Falha ao criar conta:", err);
+      return { ok: false, mensagem: mensagemErroAuth(err) };
+    }
+  }
+
+  async function redefinirSenha(email) {
+    await inicializar();
+    if (!configurado) return { ok: false, mensagem: "Sincronização não configurada (modo local)." };
+    try {
+      await auth.sendPasswordResetEmail(String(email || "").trim());
+      return { ok: true };
+    } catch (err) {
+      console.error("[Publicações] Falha ao enviar redefinição de senha:", err);
+      return { ok: false, mensagem: mensagemErroAuth(err) };
+    }
+  }
+
+  async function sairDaConta() {
+    if (!configurado) return;
+    try {
+      await auth.signOut();
+    } catch (err) {
+      console.error("[Publicações] Falha ao sair da conta:", err);
+    }
+  }
+
+  // Callback opcional que o app.js pode registrar para reagir a mudanças de login
+  let UI_AuthMudou = null;
+  function definirCallbackAuth(fn) {
+    UI_AuthMudou = fn;
   }
 
   async function buscarCongregacao(codigo) {
@@ -140,6 +218,7 @@ const Sync = (() => {
       anoServico: anoServico || String(new Date().getFullYear()),
       itens: {},
       personalizados: [],
+      catalogoOficial: null,
       atualizadoEm: pronto ? firebase.firestore.FieldValue.serverTimestamp() : Date.now(),
     };
     if (pronto) {
@@ -213,6 +292,23 @@ const Sync = (() => {
       .set({ personalizados: lista, atualizadoEm: firebase.firestore.FieldValue.serverTimestamp() }, { merge: true });
   }
 
+  // catalogo === null restaura o catálogo padrão embutido no app (remove a
+  // customização salva).
+  async function salvarCatalogoOficial(codigo, catalogo) {
+    const cod = normalizarCodigo(codigo);
+    const valor = Array.isArray(catalogo) && catalogo.length ? catalogo : null;
+    if (!pronto) {
+      const atual = lerLocal(cod) || {};
+      atual.catalogoOficial = valor;
+      gravarLocal(cod, atual);
+      return;
+    }
+    await db
+      .collection("congregacoes")
+      .doc(cod)
+      .set({ catalogoOficial: valor, atualizadoEm: firebase.firestore.FieldValue.serverTimestamp() }, { merge: true });
+  }
+
   async function arquivarCiclo(codigo, snapshot) {
     const cod = normalizarCodigo(codigo);
     if (!pronto) {
@@ -232,7 +328,7 @@ const Sync = (() => {
     });
   }
 
-  async function salvarTudo(codigo, { nome, cicloInicio, anoServico, itens, personalizados }) {
+  async function salvarTudo(codigo, { nome, cicloInicio, anoServico, itens, personalizados, catalogoOficial }) {
     const cod = normalizarCodigo(codigo);
     const dados = {
       nome,
@@ -240,6 +336,7 @@ const Sync = (() => {
       anoServico,
       itens,
       personalizados: personalizados || [],
+      catalogoOficial: catalogoOficial || null,
       atualizadoEm: pronto ? firebase.firestore.FieldValue.serverTimestamp() : Date.now(),
     };
     if (pronto) {
@@ -279,12 +376,24 @@ const Sync = (() => {
     salvarConfig,
     salvarItem,
     salvarPersonalizados,
+    salvarCatalogoOficial,
     arquivarCiclo,
     salvarTudo,
     ouvir,
     definirCallbackStatus,
+    entrarComEmail,
+    criarContaComEmail,
+    redefinirSenha,
+    sairDaConta,
+    definirCallbackAuth,
+    usuarioAtual() {
+      return usuario;
+    },
     get pronto() {
       return pronto;
+    },
+    get configurado() {
+      return configurado;
     },
   };
 })();
