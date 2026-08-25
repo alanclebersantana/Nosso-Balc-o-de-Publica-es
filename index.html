@@ -22,12 +22,84 @@
 <body>
 
 <!-- ============================================================ -->
+<!-- Tela de login (e-mail e senha) — só aparece quando o app      -->
+<!-- está configurado com Firebase                                 -->
+<!-- ============================================================ -->
+<div id="tela-login" class="overlay" hidden>
+  <div class="cartao-setup">
+    <div class="logo-setup">
+      <svg class="logo-svg" viewBox="0 0 512 512" width="56" height="56" role="img" aria-hidden="true">
+        <defs>
+          <linearGradient id="grad-login" x1="0" y1="0" x2="1" y2="1">
+            <stop offset="0" style="stop-color:var(--acento)" />
+            <stop offset="1" style="stop-color:var(--acento-forte)" />
+          </linearGradient>
+        </defs>
+        <rect width="512" height="512" rx="112" fill="url(#grad-login)" />
+        <g>
+          <rect x="126" y="330" width="260" height="34" rx="6" fill="#e7b23d" />
+          <rect x="140" y="296" width="232" height="34" rx="6" fill="#57b894" />
+          <rect x="154" y="262" width="204" height="34" rx="6" fill="#dd6b55" />
+        </g>
+        <g>
+          <rect x="150" y="120" width="212" height="150" rx="14" fill="#ffffff" />
+          <path d="M256 132 v138" stroke="#c9d7e0" stroke-width="4" />
+          <path d="M170 148 h72 M170 168 h72 M170 188 h56" stroke="#9fb4c2" stroke-width="7" stroke-linecap="round" />
+          <path d="M270 148 h72 M270 168 h72 M270 188 h56" stroke="#9fb4c2" stroke-width="7" stroke-linecap="round" />
+        </g>
+        <circle cx="372" cy="252" r="46" fill="#3fae76" stroke="#12405f" stroke-width="8" />
+        <path d="M352 253 l14 14 28 -30" fill="none" stroke="#ffffff" stroke-width="10" stroke-linecap="round" stroke-linejoin="round" />
+      </svg>
+      <h1 id="login-titulo-modo">Entrar na conta</h1>
+    </div>
+    <p class="subtitulo">Entre com seu e-mail e senha para acessar os dados da congregação. Depois de logar, você pode editar mesmo offline — o app sincroniza sozinho assim que a internet voltar.</p>
+
+    <form id="form-login">
+      <label for="login-email">E-mail</label>
+      <input id="login-email" type="email" inputmode="email" autocomplete="email" placeholder="voce@exemplo.com" required />
+
+      <label for="login-senha">Senha</label>
+      <input id="login-senha" type="password" autocomplete="current-password" placeholder="Sua senha" required minlength="6" />
+
+      <button type="submit" id="btn-login-enviar" class="botao botao-primario botao-bloco">Entrar</button>
+    </form>
+    <p id="login-erro" class="erro" hidden></p>
+
+    <div class="linha-login-links">
+      <a href="#" id="link-alternar-login" class="link-secundario">Não tem conta? Criar uma</a>
+      <a href="#" id="link-esqueci-senha" class="link-secundario">Esqueci minha senha</a>
+    </div>
+  </div>
+</div>
+
+<!-- ============================================================ -->
 <!-- Tela de configuração inicial (código da congregação)          -->
 <!-- ============================================================ -->
 <div id="tela-setup" class="overlay" hidden>
   <div class="cartao-setup">
     <div class="logo-setup">
-      <img src="icons/icon-96.png" alt="" width="56" height="56" />
+      <svg class="logo-svg" viewBox="0 0 512 512" width="56" height="56" role="img" aria-hidden="true">
+        <defs>
+          <linearGradient id="grad-setup" x1="0" y1="0" x2="1" y2="1">
+            <stop offset="0" style="stop-color:var(--acento)" />
+            <stop offset="1" style="stop-color:var(--acento-forte)" />
+          </linearGradient>
+        </defs>
+        <rect width="512" height="512" rx="112" fill="url(#grad-setup)" />
+        <g>
+          <rect x="126" y="330" width="260" height="34" rx="6" fill="#e7b23d" />
+          <rect x="140" y="296" width="232" height="34" rx="6" fill="#57b894" />
+          <rect x="154" y="262" width="204" height="34" rx="6" fill="#dd6b55" />
+        </g>
+        <g>
+          <rect x="150" y="120" width="212" height="150" rx="14" fill="#ffffff" />
+          <path d="M256 132 v138" stroke="#c9d7e0" stroke-width="4" />
+          <path d="M170 148 h72 M170 168 h72 M170 188 h56" stroke="#9fb4c2" stroke-width="7" stroke-linecap="round" />
+          <path d="M270 148 h72 M270 168 h72 M270 188 h56" stroke="#9fb4c2" stroke-width="7" stroke-linecap="round" />
+        </g>
+        <circle cx="372" cy="252" r="46" fill="#3fae76" stroke="#12405f" stroke-width="8" />
+        <path d="M352 253 l14 14 28 -30" fill="none" stroke="#ffffff" stroke-width="10" stroke-linecap="round" stroke-linejoin="round" />
+      </svg>
       <h1>Nosso Balcão Publicações</h1>
     </div>
     <p class="subtitulo">Controle de movimento mensal de publicações, com base no formulário S-28-T.</p>
@@ -67,7 +139,28 @@
   <header class="topo">
     <div class="topo-linha">
       <div class="marca">
-        <img src="icons/icon-96.png" alt="" width="34" height="34" />
+        <svg class="logo-svg" viewBox="0 0 512 512" width="34" height="34" role="img" aria-hidden="true">
+          <defs>
+            <linearGradient id="grad-marca" x1="0" y1="0" x2="1" y2="1">
+              <stop offset="0" style="stop-color:var(--acento)" />
+              <stop offset="1" style="stop-color:var(--acento-forte)" />
+            </linearGradient>
+          </defs>
+          <rect width="512" height="512" rx="112" fill="url(#grad-marca)" />
+          <g>
+            <rect x="126" y="330" width="260" height="34" rx="6" fill="#e7b23d" />
+            <rect x="140" y="296" width="232" height="34" rx="6" fill="#57b894" />
+            <rect x="154" y="262" width="204" height="34" rx="6" fill="#dd6b55" />
+          </g>
+          <g>
+            <rect x="150" y="120" width="212" height="150" rx="14" fill="#ffffff" />
+            <path d="M256 132 v138" stroke="#c9d7e0" stroke-width="4" />
+            <path d="M170 148 h72 M170 168 h72 M170 188 h56" stroke="#9fb4c2" stroke-width="7" stroke-linecap="round" />
+            <path d="M270 148 h72 M270 168 h72 M270 188 h56" stroke="#9fb4c2" stroke-width="7" stroke-linecap="round" />
+          </g>
+          <circle cx="372" cy="252" r="46" fill="#3fae76" stroke="#12405f" stroke-width="8" />
+          <path d="M352 253 l14 14 28 -30" fill="none" stroke="#ffffff" stroke-width="10" stroke-linecap="round" stroke-linejoin="round" />
+        </svg>
         <div class="marca-texto">
           <span class="marca-eyebrow">Nosso Balcão</span>
           <span class="marca-nome">Publicações</span>
@@ -222,6 +315,18 @@
     <div class="campo">
       <button id="cfg-trocar" class="botao botao-secundario botao-bloco">Sair / trocar de congregação</button>
     </div>
+
+    <div id="cfg-secao-conta" hidden>
+      <hr />
+      <p class="secao-titulo">Conta</p>
+      <div class="campo">
+        <label>Logado como</label>
+        <input id="cfg-email-conta" type="text" readonly />
+      </div>
+      <div class="campo">
+        <button id="cfg-sair-conta" class="botao botao-perigo botao-bloco">Sair da conta</button>
+      </div>
+    </div>
   </div>
 </div>
 
@@ -285,11 +390,9 @@
       </button>
     </div>
 
-
     <p class="secao-titulo">1. Exportar as publicações extras atuais</p>
     <div class="campo">
       <button id="btn-exportar-csv" class="botao botao-secundario botao-bloco">Baixar em CSV</button>
-      <p class="ajuda">Abra o arquivo numa planilha, adicione/remova/edite linhas mantendo as colunas, e importe de volta abaixo.</p>
     </div>
 
     <hr />
@@ -312,14 +415,25 @@
 
     <hr />
 
-    <p class="secao-titulo">3. Quando o S-28-T for revisado</p>
+    <p class="secao-titulo">3. Atualizar catálogo oficial (revisão nova do S-28-T)</p>
+    <div class="campo">
+      <div class="zona-importar">
+        Escolha um arquivo .csv com as colunas <strong>categoria, titulo, sigla, codigo, kit</strong> — peça pro Claude gerar esse arquivo a partir do PDF novo
+        <br /><input type="file" id="input-importar-catalogo" accept=".csv,text/csv" />
+      </div>
+      <div class="linha-botoes">
+        <button id="btn-importar-catalogo" class="botao botao-primario">Atualizar catálogo oficial</button>
+      </div>
+    </div>
 
     <hr />
 
     <p class="secao-titulo">Restaurar</p>
     <div class="campo">
       <button id="btn-restaurar-catalogo" class="botao botao-perigo botao-bloco">Remover todas as publicações extras</button>
-      <p class="ajuda">O catálogo oficial do S-28-T não é afetado, e os números já lançados nas publicações extras removidas não somem do histórico salvo — só deixam de aparecer na lista.</p>
+    </div>
+    <div class="campo">
+      <button id="btn-restaurar-catalogo-oficial" class="botao botao-perigo botao-bloco" hidden>Restaurar catálogo oficial padrão</button>
     </div>
   </div>
 </div>

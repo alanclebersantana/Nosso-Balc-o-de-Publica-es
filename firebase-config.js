@@ -7,12 +7,11 @@
    Console do Firebase → Configurações do projeto → Seus apps → Config
    ========================================================================== */
 
-const firebaseConfig = {
-  apiKey: "AIzaSyBT8QTChpEToearfly_Z88EAwwi8F1OsxU",
-  authDomain: "nosso-balcao.firebaseapp.com",
-  projectId: "nosso-balcao",
-  storageBucket: "nosso-balcao.firebasestorage.app",
-  messagingSenderId: "813858650292",
-  appId: "1:813858650292:web:a83fa0887db85a4af87fe1"
+const FIREBASE_CONFIG = {
+  apiKey: "COLE_AQUI_SUA_API_KEY",
+  authDomain: "SEU-PROJETO.firebaseapp.com",
+  projectId: "SEU-PROJETO",
+  storageBucket: "SEU-PROJETO.appspot.com",
+  messagingSenderId: "000000000000",
+  appId: "1:000000000000:web:xxxxxxxxxxxxxxxxxxxxxx",
 };
-

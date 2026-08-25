@@ -49,7 +49,7 @@ const Exportar = (() => {
     const totalColunas = 3 + meses.length * 3;
     const body = [];
 
-    catalogoCompleto(estado.personalizados).forEach((cat) => {
+    catalogoCompleto(estado.personalizados, estado.catalogoOficial).forEach((cat) => {
       body.push([
         {
           content: cat.categoria,
