@@ -2,7 +2,7 @@
    Service Worker — cache do "app shell" para uso offline e instalação
    ========================================================================== */
 
-const VERSAO_CACHE = "publicacoes-v4";
+const VERSAO_CACHE = "publicacoes-v5";
 
 const ARQUIVOS_ESSENCIAIS = [
   "./",
